@@ -3,18 +3,24 @@ setlocal
 title DSE News
 set "APP=%LOCALAPPDATA%\DSE-News"
 set "ZIP=%TEMP%\dse-news.zip"
-set "PYVER=3.12.8"
-set "PYDIR=%LOCALAPPDATA%\Programs\Python\Python312"
 set "PYEXE="
 
-rem ---- Find a REAL Python (the Microsoft Store shortcut does not count) ----
+rem ---- Check System PATH first ----
 python -c "import sys" >nul 2>nul
 if not errorlevel 1 set "PYEXE=python"
 if defined PYEXE goto havepython
-if exist "%PYDIR%\python.exe" set "PYEXE=%PYDIR%\python.exe"
+
+rem ---- Search for any installed Python version automatically (3.15, 3.16, 3.18, etc.) ----
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
+    if exist "%%D\python.exe" set "PYEXE=%%D\python.exe"
+)
 if defined PYEXE goto havepython
 
-echo Python is not installed. Downloading and installing it automatically...
+rem ---- Fallback: Download Python 3.15 if no Python exists at all ----
+set "PYVER=3.15.0"
+set "PYDIR=%LOCALAPPDATA%\Programs\Python\Python315"
+
+echo Python is not installed. Downloading and installing Python %PYVER%...
 powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol = 'Tls12'; Invoke-WebRequest -UseBasicParsing 'https://www.python.org/ftp/python/%PYVER%/python-%PYVER%-amd64.exe' -OutFile '%TEMP%\python-installer.exe' } catch { exit 1 }"
 if errorlevel 1 goto pyfail
 "%TEMP%\python-installer.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0 Include_launcher=0
@@ -25,12 +31,13 @@ goto havepython
 
 :pyfail
 echo.
-echo Automatic Python install failed. Please install Python 3.10+ from
-echo https://www.python.org/downloads/  ^(tick "Add python.exe to PATH"^), then run this file again.
+echo Automatic Python install failed. Please install Python from
+echo https://www.python.org/downloads/ ^(tick "Add python.exe to PATH"^), then run this file again.
 pause
 exit /b 1
 
 :havepython
+echo Using Python: %PYEXE%
 echo Downloading the latest DSE News app...
 powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing 'https://codeload.github.com/Abidhr-01/dse-data-scrape/zip/refs/heads/main' -OutFile '%ZIP%'; if (Test-Path '%APP%\src') { Remove-Item -Recurse -Force '%APP%\src' }; if (Test-Path '%APP%\tmp') { Remove-Item -Recurse -Force '%APP%\tmp' }; Expand-Archive -Force '%ZIP%' '%APP%\tmp'; Move-Item '%APP%\tmp\dse-data-scrape-main' '%APP%\src'; Remove-Item -Recurse -Force '%APP%\tmp' } catch { exit 1 }"
 if errorlevel 1 (
